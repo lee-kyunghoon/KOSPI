@@ -1,0 +1,41 @@
+# KOSPI 예측 모델 학습 설정
+
+# 데이터
+data:
+  sequence_length: 30
+  prediction_days: 5
+  target_feature_idx: 0
+  batch_size: 16
+  normalization_method: 'robust'  # 'robust' or 'minmax'
+
+# 모델
+model:
+  model_name: 'AECNN'  # 'AECNN' or 'CNNTrans'
+  in_features: 9
+  sae_hidden_dims: [64, 32]
+  sae_latent_dim: 16
+  sae_noise_factor: 0.05  # SAE Denoising: 5% Gaussian noise
+  backbone: 'tcn'  # 'tcn' or 'timesnet'
+  tcn_channels: [25, 25, 25, 25]
+  tcn_kernel_size: 7
+  dropout: 0.2
+  use_revin: true  # RevIN: Reversible Instance Normalization
+
+# 학습
+training:
+  num_epochs: 30
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  patience: 30
+  warmup_epochs: 3  # Warmup epochs
+  min_lr: 0.00001  # Minimum learning rate for cosine annealing
+  grad_clip_norm: 10.0
+  prediction_weight: 50.0  # MSE 예측 손실 가중치
+  reconstruction_weight: 0.1  # SAE Reconstruction loss weight
+  directional_weight: 1  # Directional loss weight
+
+# 체크포인트
+checkpoint:
+  dir: 'checkpoints'
+  save_best: true
+  save_final: true

@@ -1,101 +1,146 @@
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 from cnn_trans import CNNTrans
-# 데이터 로딩 및 전처리를 위한 라이브러리 (예시)
-# import numpy as np 
-# from sklearn.preprocessing import MinMaxScaler
+import pandas as pd
+import os
+import numpy as np
+import sys
 
-# --- 1. 모델 클래스 정의 ---
-# 이전에 정의한 CNNTransEncoderSPP, Conv1dEmbedding, TabularPositionEncoding 클래스가 
-# 이 파일에 있거나 import 되어야 합니다.
-# from model_definition import CNNTransEncoderSPP 
+# 상위 디렉토리를 path에 추가
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+from data.dataset import Dataset
 
-# --- 2. 학습된 모델 로드 ---
+#1. 하이퍼파라미터 설정 (학습 시와 동일하게)
+batch_size = 1
+INPUT_WINDOW_SIZE = 15  # 입력으로 사용할 과거 15일치 데이터 (학습 시 설정과 동일해야 함)
+OUTPUT_WINDOW_SIZE = 5   # 예측할 미래 5일치 데이터
+TARGET_FEATURE_INDEX = 0 # 예측 목표는 'KOSPI_Close' (인덱스 0)
+input_features = 9
+output_size = 1
+d_model = 512
 
-# 장치 설정
+#2. 디바이스 설정
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"예측에 사용할 장치: {device}")
+print(f"사용 가능한 장치: {device}")
 
-# 모델 인스턴스 생성 (학습 시와 동일한 하이퍼파라미터 사용)
-# 예를 들어, 3일치를 예측하도록 학습했다면 output_size=3
+#3. 모델 인스턴스 생성
 model = CNNTrans(
-    input_features=5,
+    input_features=9,
     conv_out_channels=252,
     conv_kernel_size=3,
     d_model=512,
     nhead=8,
     num_encoder_layers=3,
-    num_decoder_layers=3,
     dim_feedforward=2048,
-    output_size=1
+    output_size=output_size
 )
-
-# 학습된 가중치 파일(.pth 또는 .pt) 로드
-# 'best_model.pth'는 학습 과정에서 저장한 파일명으로 변경해야 합니다.
-try:
-    model.load_state_dict(torch.load('best_model.pth', map_location=device))
-    print("학습된 모델 가중치를 성공적으로 로드했습니다.")
-except FileNotFoundError:
-    print("경고: 저장된 모델 파일을 찾을 수 없습니다. 초기화된 모델로 예측을 수행합니다.")
-
-# 모델을 device로 이동
 model.to(device)
 
+#4. 저장된 모델 불러오기
+checkpoint_path = "/mnt/d/lgh/kospi/checkpoints/20251120_125134/cnn_trans_best.pt"  # 원하는 체크포인트 경로
+checkpoint = torch.load(checkpoint_path, map_location=device)
+model.load_state_dict(checkpoint['model_state_dict'])
+print(f"모델 로드 완료: {checkpoint_path}")
+print(f"로드된 에포크: {checkpoint['epoch']}, 학습 손실: {checkpoint['train_loss']:.6f}")
+#5. Train 데이터 로드 (scaler를 얻기 위해)
+train_data = pd.read_csv("/home/lgh/kospi/data/train.csv")
+train_data = train_data.drop(columns=['Date'])
+train_data = train_data.values
 
-# --- 3. 예측을 위한 함수 정의 ---
+train_dataset = Dataset(
+    data=train_data,
+    input_window=INPUT_WINDOW_SIZE,
+    output_window=OUTPUT_WINDOW_SIZE,
+    target_feature_idx=TARGET_FEATURE_INDEX
+)
 
-def predict(model, input_data, device):
-    """
-    학습된 모델을 사용하여 예측을 수행하는 함수입니다.
-    
-    Args:
-        model (nn.Module): 학습이 완료된 모델.
-        input_data (torch.Tensor): 예측에 사용할 입력 데이터. 
-                                   shape: (batch_size, seq_len, features)
-        device (torch.device): 연산을 수행할 장치 (cpu 또는 cuda).
-    
-    Returns:
-        torch.Tensor: 모델의 예측 결과.
-    """
-    # 모델을 평가 모드(evaluation mode)로 설정
-    # Dropout, BatchNorm 등의 동작을 비활성화하여 일관된 예측 결과를 얻습니다.
-    model.eval()
-    
-    # 기울기 계산을 비활성화하여 메모리 사용량을 줄이고 계산 속도를 높입니다.
-    with torch.no_grad():
-        # 1. 입력 데이터를 모델과 동일한 장치로 이동
-        input_data = input_data.to(device)
+test_data = pd.read_csv("/home/lgh/kospi/data/test2.csv")
+test_dates = test_data['Date'].values
+test_data = test_data.drop(columns=['Date'])
+test_data_raw = test_data.values
+
+test_dataset = Dataset(
+    data=test_data_raw,
+    input_window=INPUT_WINDOW_SIZE,
+    output_window=OUTPUT_WINDOW_SIZE,
+    target_feature_idx=TARGET_FEATURE_INDEX,
+    scaler=train_dataset.scaler
+)
+
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
+
+model.eval()
+
+print("\n=== 테스트 데이터 예측 시작 ===\n")
+
+# 역정규화를 위한 준비
+scaler = test_dataset.scaler
+kospi_close_idx = TARGET_FEATURE_INDEX
+min_val = scaler.data_min_[kospi_close_idx]
+scale_val = scaler.scale_[kospi_close_idx]
+
+all_actuals = []
+all_predictions = []
+
+print("=" * 100)
+print(f"{'배치':<8} {'일차':<6} {'실제 KOSPI 종가':<25} {'예측 KOSPI 종가':<25} {'차이(원)':<15}")
+print("=" * 100)
+
+with torch.no_grad():
+    for batch_idx, (src, label) in enumerate(test_loader):
+        src = src.to(device)
+        label = label.to(device)
         
-        # 2. 모델을 통해 예측 수행
-        prediction = model(input_data)
+        output,_ = model(src)
         
-    # 3. 결과를 CPU로 다시 가져와 후처리를 위해 반환
-    return prediction.cpu()
+        output_np = output.cpu().numpy()
+        label_np = label.cpu().numpy()
+        
+        # 배치 내의 각 샘플에 대해 처리 (batch_size=1이므로 한 번만 반복)
+        for sample_idx in range(output_np.shape[0]):
+            pred_sample = output_np[sample_idx].squeeze()
+            actual_sample = label_np[sample_idx]
+            
+            pred_denorm = pred_sample / scale_val + min_val
+            actual_denorm = actual_sample / scale_val + min_val
+            
+            all_actuals.extend(actual_sample)
+            all_predictions.extend(pred_sample)
+            
+            for day in range(OUTPUT_WINDOW_SIZE):
+                actual_price = actual_denorm[day]
+                pred_price = pred_denorm[day]
+                diff = abs(actual_price - pred_price)
+                
+                print(f"{batch_idx:<8} {day+1:<6} {actual_price:<25.2f} {pred_price:<25.2f} {diff:<15.2f}")
+            print("-" * 100)
 
+all_actuals = np.array(all_actuals)
+all_predictions = np.array(all_predictions)
 
-# --- 4. 실제 예측 수행 ---
+mae = np.mean(np.abs(all_actuals - all_predictions))
+mape = np.mean(np.abs((all_actuals - all_predictions)/all_actuals))
+mse = np.mean((all_actuals - all_predictions) ** 2)
+rmse = np.sqrt(mse)
 
-# 예시: 예측에 사용할 새로운 데이터 준비 (과거 5일치 데이터)
-# 실제로는 데이터로더나 별도의 전처리 함수를 통해 준비해야 합니다.
-# (batch_size=1, seq_len=30, features=5)
-new_data_point = torch.randn(1, 30, 5) 
+print("\n=== 전체 예측 성능 (정규화된 값 기준) ===")
+print(f"MAE (Mean Absolute Error): {mae:.6f}")
+print(f"MSE (Mean Squared Error): {mse:.6f}")
+print(f"MAPE (Mean Absolute Percentage Error): {mape:.6f}")
 
-# 정규화(Normalization) 과정이 필요합니다.
-# 학습 시 사용했던 Scaler를 그대로 사용해야 합니다.
-# scaler = MinMaxScaler()
-# new_data_point_normalized = scaler.transform(new_data_point.reshape(-1, 5)).reshape(1, 5, 5)
-# new_data_tensor = torch.FloatTensor(new_data_point_normalized)
+actuals_denorm = all_actuals / scale_val + min_val
+predictions_denorm = all_predictions / scale_val + min_val
 
-# 예측 함수 호출
-predicted_values = predict(model, new_data_point, device)
+print("\n=== 전체 예측 성능 (실제 KOSPI 종가 기준) ===")
+mae_denorm = np.mean(np.abs(actuals_denorm - predictions_denorm))
+mse_denorm = np.mean((actuals_denorm - predictions_denorm) ** 2)
+mape_denorm = np.mean(np.abs((actuals_denorm - predictions_denorm)/actuals_denorm)) * 100
 
-# 예측 결과 후처리 (역정규화, Denormalization)
-# 학습 시 데이터를 정규화했다면, 예측 결과는 다시 원래의 스케일로 되돌려야 의미를 가집니다.
-# predicted_values_original_scale = scaler.inverse_transform(predicted_values)
+print(f"총 배치 수: {batch_idx + 1}")
+print(f"총 예측 개수: {len(all_predictions)}")
+print(f"MAE: {mae_denorm:.2f} 원")
+print(f"MSE: {mse_denorm:.2f}")
+print(f"MAPE: {mape_denorm:.6f}")
 
-print("\n--- 예측 결과 ---")
-print(f"입력 데이터 shape: {new_data_point.shape}")
-print(f"모델 예측 결과 (정규화된 값): {predicted_values}")
-print(f"예측 결과 shape: {predicted_values.shape}")
-# print(f"모델 예측 결과 (원래 스케일): {predicted_values_original_scale}")
-
+print("\n테스트 완료!")

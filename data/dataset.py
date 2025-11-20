@@ -15,11 +15,15 @@ class Dataset(Dataset):
         input_window (int): 모델에 입력으로 사용할 과거 데이터의 길이 (예: 30일).
         output_window (int): 예측할 미래 데이터의 길이 (예: 5일).
         target_feature_idx (int): 예측 목표가 되는 특징의 인덱스 (예: 종가의 인덱스).
+        batch_shuffle (bool): 배치 단위로 데이터를 섞을지 여부 (기본값: False).
+        batch_size (int): 배치 크기 (batch_shuffle이 True일 때 필요).
     """
-    def __init__(self, data, input_window, output_window, target_feature_idx=3, scaler=None):
+    def __init__(self, data, input_window, output_window, target_feature_idx=3, scaler=None, batch_shuffle=False, batch_size=32):
         self.input_window = input_window
         self.output_window = output_window
         self.target_feature_idx = target_feature_idx
+        self.batch_shuffle = batch_shuffle
+        self.batch_size = batch_size
         row_data = data.copy()
         self.data = data
         
@@ -27,7 +31,7 @@ class Dataset(Dataset):
         if scaler is None:
             # Scaler가 제공되지 않으면, 학습 데이터셋으로 간주합니다.
             # 새로운 Scaler를 생성하고 fit_transform을 수행합니다.
-            self.scaler = MinMaxScaler()
+            self.scaler = MinMaxScaler(feature_range=(0.1, 1.1))
             self.data = self.scaler.fit_transform(data)
 
             # scale 확인용 코드
@@ -73,8 +77,15 @@ class Dataset(Dataset):
 
     def __getitem__(self, idx):
         # 주어진 인덱스(idx)에 해당하는 학습 데이터와 정답 데이터를 텐서로 변환하여 반환
-        x = torch.FloatTensor(self.X[idx])
-        y = torch.FloatTensor(self.Y[idx])
+        # 랜덤 인덱스 선택
+        if(self.batch_shuffle):
+            random_idx = np.random.randint(0, len(self.X))
+            x = torch.FloatTensor(self.X[random_idx])
+            y = torch.FloatTensor(self.Y[random_idx])
+        else:
+            x = torch.FloatTensor(self.X[idx])
+            y = torch.FloatTensor(self.Y[idx])
+    
         return x, y
 
 

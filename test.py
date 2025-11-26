@@ -1,11 +1,3 @@
-"""
-Test script for KOSPI prediction model
-- Load trained model from checkpoint
-- Predict on test data
-- Calculate metrics (MSE, MAE, MAPE, R2)
-- Visualize predictions
-"""
-
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -24,7 +16,7 @@ import argparse
 
 
 def load_config(config_path='config/config.yaml'):
-    with open(config_path, 'r') as f:
+    with open(config_path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
 
 
@@ -55,8 +47,8 @@ def load_model(checkpoint_path, config, device):
             sae_latent_dim=config['model']['sae_latent_dim'],
             sae_noise_factor=config['model']['sae_noise_factor'],
             backbone=config['model']['backbone'],
-            tcn_channels=config['model']['tcn_channels'],
-            tcn_kernel_size=config['model']['tcn_kernel_size'],
+            cnn_channels=config['model']['cnn_channels'],
+            cnn_kernel_sizes=config['model']['cnn_kernel_size'],
             prediction_days=config['data']['prediction_days'],
             sequence_length=config['data']['sequence_length'],
             dropout=config['model']['dropout'],
@@ -67,12 +59,13 @@ def load_model(checkpoint_path, config, device):
         model = CNNTrans(
             input_features=config['model']['in_features'],
             output_seq_len=config['data']['prediction_days'],
-            conv_out_channels=252,
-            conv_kernel_size=3,
-            d_model=512,
-            nhead=8,
-            num_encoder_layers=3,
-            dim_feedforward=2048,
+            conv_out_channels=config['model'].get('conv_out_channels', 252),
+            conv_kernel_size=config['model'].get('conv_kernel_size', 3),
+            d_model=config['model'].get('d_model', 512),
+            nhead=config['model'].get('nhead', 8),
+            num_encoder_layers=config['model'].get('num_encoder_layers', 3),
+            dim_feedforward=config['model'].get('dim_feedforward', 2048),
+            dropout=config['model'].get('dropout', 0.1),
         ).to(device)
     else:
         raise ValueError(f"Unknown model name: {model_name}. Supported: 'aecnn', 'cnntrans'")
@@ -93,21 +86,20 @@ def load_model(checkpoint_path, config, device):
 def prepare_test_data(config):
     """Prepare test dataset"""
     test_df = pd.read_csv("data/test.csv")
-    test_dates = pd.to_datetime(test_df['Date'])
     test_data = test_df.drop(columns=['Date']).values
     
     # Load scaler
-    with open('data/scaler_info.pkl', 'rb') as f:
-        scaler = pickle.load(f)
-    
-    test_normalized = scaler.transform(test_data)
+    if config['data']['normalization_method'] in ['robust', 'minmax']:
+        with open('data/scaler_info.pkl', 'rb') as f:
+            scaler = pickle.load(f)
+        
+        test_data = scaler.transform(test_data)
     
     test_dataset = KospiDataset(
-        test_normalized, 
+        test_data, 
         config['data']['sequence_length'], 
         config['data']['prediction_days'], 
         config['data']['target_feature_idx'],
-        dates=test_dates
     )
     
     test_loader = DataLoader(
@@ -133,7 +125,7 @@ def test_model(model, test_loader, scaler, device, config, model_name):
     print("="*70)
     
     with torch.no_grad():
-        for X, y, x_dates, y_dates in test_loader:
+        for X, y in test_loader:
             X, y = X.to(device), y.to(device)
             
             # Handle different model outputs
@@ -141,7 +133,7 @@ def test_model(model, test_loader, scaler, device, config, model_name):
                 output, _ = model(X)  # CNNTrans returns (output, change_cost)
                 output = output.squeeze(-1)  # (batch, 5, 1) -> (batch, 5)
             else:  # aecnn
-                output = model(X, False, x_dates, y_dates)  # AECNN needs dates for TimesNet
+                output = model(X, False)  # AECNN needs dates for TimesNet
             
             loss = criterion(output, y)
             
@@ -155,7 +147,7 @@ def test_model(model, test_loader, scaler, device, config, model_name):
     targets = np.concatenate(all_targets, axis=0)  # (N, 5)
     
     # Inverse transform to original scale (Close price only)
-    n_features = 9
+    n_features = config['model']['in_features']
     n_pred_days = predictions.shape[1]
     
     predictions_original = np.zeros_like(predictions)

@@ -1,6 +1,7 @@
 import torch
 import yaml
-from trainers import AECNNTrainer, CNNTransTrainer
+from trainers.aecnn_trainer import AECNNTrainer
+from trainers.cnntrans_trainer import CNNTransTrainer
 
 
 def load_config(config_path='config/config.yaml'):

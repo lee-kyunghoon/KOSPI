@@ -63,16 +63,17 @@ def load_model(checkpoint_path, config, device):
             use_revin=config['model']['use_revin']
         ).to(device)
     elif model_name == 'cnntrans':
-        from model.transformer.transformer import CNNTrans
+        from model.transformer.cnn_trans import CNNTrans
         model = CNNTrans(
             input_features=config['model']['in_features'],
             output_seq_len=config['data']['prediction_days'],
-            conv_out_channels=252,
-            conv_kernel_size=3,
-            d_model=512,
-            nhead=8,
-            num_encoder_layers=3,
-            dim_feedforward=2048,
+            conv_out_channels=config['model'].get('conv_out_channels', 252),
+            conv_kernel_size=config['model'].get('conv_kernel_size', 3),
+            d_model=config['model'].get('d_model', 512),
+            nhead=config['model'].get('nhead', 8),
+            num_encoder_layers=config['model'].get('num_encoder_layers', 3),
+            dim_feedforward=config['model'].get('dim_feedforward', 2048),
+            dropout=config['model'].get('dropout', 0.1)
         ).to(device)
     else:
         raise ValueError(f"Unknown model name: {model_name}. Supported: 'aecnn', 'cnntrans'")

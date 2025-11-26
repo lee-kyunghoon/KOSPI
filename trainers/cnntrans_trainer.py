@@ -7,7 +7,7 @@ import torch.nn as nn
 import os
 from tqdm import tqdm
 from trainers.base_trainer import BaseTrainer
-from model.transformer.transformer import CNNTrans
+from model.transformer.cnn_trans import CNNTrans
 
 
 class CNNTransTrainer(BaseTrainer):
@@ -18,12 +18,13 @@ class CNNTransTrainer(BaseTrainer):
         self.model = CNNTrans(
             input_features=self.config['model']['in_features'],
             output_seq_len=self.config['data']['prediction_days'],
-            conv_out_channels=252,
-            conv_kernel_size=3,
-            d_model=512,
-            nhead=8,
-            num_encoder_layers=3,
-            dim_feedforward=2048,
+            conv_out_channels=self.config['model'].get('conv_out_channels', 252),
+            conv_kernel_size=self.config['model'].get('conv_kernel_size', 3),
+            d_model=self.config['model'].get('d_model', 512),
+            nhead=self.config['model'].get('nhead', 8),
+            num_encoder_layers=self.config['model'].get('num_encoder_layers', 3),
+            dim_feedforward=self.config['model'].get('dim_feedforward', 2048),
+            dropout=self.config['model'].get('dropout', 0.1)
         ).to(self.device)
         
         self.criterion = nn.MSELoss()

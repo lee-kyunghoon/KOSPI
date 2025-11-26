@@ -17,29 +17,38 @@ def load_config(config_path='config/config.yaml'):
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
-def get_random_hyperparameters():
+def get_random_hyperparameters(model_name):
     """
     랜덤 서치를 위한 하이퍼파라미터 공간 정의 및 샘플링
     """
-    # 검색 공간 정의
+
     search_space = {
-        'learning_rate': [1e-3, 5e-4, 1e-4, 5e-5, 1e-5],
         'batch_size': [8, 16, 32, 64],
-        'd_model': [128, 256, 512],
-        'num_encoder_layers': [2, 3, 4],
-        'nhead': [4, 8],
-        'dropout': [0.1, 0.2, 0.3],
-        'dim_feedforward': [512, 1024, 2048]
     }
+
+    if(model_name == 'CNNTrans'):
+        search_space['d_model'] = [128, 256, 512]
+        search_space['num_encoder_layers'] = [2, 3, 4]
+        search_space['nhead'] = [4, 8]
+        search_space['dropout'] = [0.1, 0.2, 0.3]
+        search_space['dim_feedforward'] = [512, 1024, 2048]
     
     # 랜덤 샘플링
     params = {}
-    params['learning_rate'] = random.choice(search_space['learning_rate'])
+    params['learning_rate'] = random.uniform(1e-5, 1e-3)
     params['batch_size'] = random.choice(search_space['batch_size'])
-    params['d_model'] = random.choice(search_space['d_model'])
-    params['num_encoder_layers'] = random.choice(search_space['num_encoder_layers'])
-    params['nhead'] = random.choice(search_space['nhead'])
-    
+
+    if(model_name == 'CNNTrans'):
+        params['d_model'] = random.choice(search_space['d_model'])
+        params['num_encoder_layers'] = random.choice(search_space['num_encoder_layers'])
+        params['nhead'] = random.choice(search_space['nhead'])
+
+    else:
+        params['sae_noise_factor'] = random.uniform(0, 0.1)
+        params['prediction_weight'] = random.uniform(0, 1)
+        params['reconstruction_weight'] = random.uniform(0, 1)
+        params['directional_weight'] = random.uniform(0, 1)   
+        
     # d_model은 nhead로 나누어 떨어져야 함
     while params['d_model'] % params['nhead'] != 0:
         params['nhead'] = random.choice(search_space['nhead'])
@@ -68,7 +77,7 @@ def main():
         print(f"{'='*50}")
         
         # 하이퍼파라미터 샘플링
-        params = get_random_hyperparameters()
+        params = get_random_hyperparameters(base_config['model']['model_name'])
         print("Sampled Hyperparameters:")
         for k, v in params.items():
             print(f"  {k}: {v}")

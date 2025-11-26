@@ -24,7 +24,7 @@ class CNNTransTrainer(BaseTrainer):
             nhead=self.config['model'].get('nhead', 8),
             num_encoder_layers=self.config['model'].get('num_encoder_layers', 3),
             dim_feedforward=self.config['model'].get('dim_feedforward', 2048),
-            dropout=self.config['model'].get('dropout', 0.1)
+            dropout=self.config['model'].get('dropout', 0.1),
         ).to(self.device)
         
         self.criterion = nn.MSELoss()
@@ -42,20 +42,20 @@ class CNNTransTrainer(BaseTrainer):
         print(f"TensorBoard:     {self.log_dir}")
         print(f"{'='*70}\n")
     
-    def train_batch(self, X, y, x_dates, y_dates):
+    def train_batch(self, X, y):
         X, y = X.to(self.device), y.to(self.device)
         
         self.optimizer.zero_grad()
         
         src = X
-        label = y.unsqueeze(-1)
+        label = y
         
         output, change_cost = self.model(src)
         
-        last_input = src[:, -1, 0].unsqueeze(-1).unsqueeze(-1)
-        label_ratio = label / (last_input + 1e-8)
+        # last_input = src[:, -1, 0].unsqueeze(-1).unsqueeze(-1)
+        # label_ratio = label / (last_input + 1e-8)
         
-        loss = self.criterion(change_cost, label_ratio)
+        loss = self.criterion(output, label)
         
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config['training']['grad_clip_norm'])
@@ -65,18 +65,18 @@ class CNNTransTrainer(BaseTrainer):
             'total_loss': loss.item()
         }
     
-    def validate_batch(self, X, y, x_dates, y_dates):
+    def validate_batch(self, X, y):
         X, y = X.to(self.device), y.to(self.device)
         
         src = X
-        label = y.unsqueeze(-1)
+        label = y
         
         output, change_cost = self.model(src)
         
-        last_input = src[:, -1, 0].unsqueeze(-1).unsqueeze(-1)
-        label_ratio = label / (last_input + 1e-8)
+        # last_input = src[:, -1, 0].unsqueeze(-1).unsqueeze(-1)
+        # label_ratio = label / (last_input + 1e-8)
         
-        loss = self.criterion(change_cost, label_ratio)
+        loss = self.criterion(output, label)
         
         return {
             'total_loss': loss.item()
@@ -90,9 +90,9 @@ class CNNTransTrainer(BaseTrainer):
         
         batch_count = 0
         for batch_data in train_pbar:
-            X, y, x_dates, y_dates = batch_data
+            X, y = batch_data
             
-            metrics = self.train_batch(X, y, x_dates, y_dates)
+            metrics = self.train_batch(X, y)
             
             train_loss += metrics['total_loss']
             batch_count += 1
@@ -114,9 +114,9 @@ class CNNTransTrainer(BaseTrainer):
         batch_count = 0
         with torch.no_grad():
             for batch_data in valid_pbar:
-                X, y, x_dates, y_dates = batch_data
+                X, y = batch_data
                 
-                metrics = self.validate_batch(X, y, x_dates, y_dates)
+                metrics = self.validate_batch(X, y)
                 
                 valid_loss += metrics['total_loss']
                 batch_count += 1

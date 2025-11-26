@@ -46,33 +46,30 @@ class BaseTrainer:
     def prepare_data(self):
         train_df = pd.read_csv("data/train.csv")
         valid_df = pd.read_csv("data/valid.csv")
-        
-        train_dates = pd.to_datetime(train_df['Date'])
-        valid_dates = pd.to_datetime(valid_df['Date'])
-        
+                
         train_data = train_df.drop(columns=['Date']).values
         valid_data = valid_df.drop(columns=['Date']).values
         
-        scaler = RobustScaler() if self.config['data']['normalization_method'] == 'robust' else MinMaxScaler()
-        train_normalized = scaler.fit_transform(train_data)
-        valid_normalized = scaler.transform(valid_data)
+        scaler = None
+        if self.config['data']['normalization_method'] in ['robust', 'minmax']:
+            scaler = RobustScaler() if self.config['data']['normalization_method'] == 'robust' else MinMaxScaler()
+            train_data = scaler.fit_transform(train_data)
+            valid_data = scaler.transform(valid_data)
         
         with open('data/scaler_info.pkl', 'wb') as f:
             pickle.dump(scaler, f)
         
         train_dataset = KospiDataset(
-            train_normalized, 
+            train_data, 
             self.config['data']['sequence_length'], 
             self.config['data']['prediction_days'], 
             self.config['data']['target_feature_idx'],
-            dates=train_dates
         )
         valid_dataset = KospiDataset(
-            valid_normalized, 
+            valid_data, 
             self.config['data']['sequence_length'], 
             self.config['data']['prediction_days'], 
             self.config['data']['target_feature_idx'],
-            dates=valid_dates
         )
         
         train_loader = DataLoader(train_dataset, batch_size=self.config['data']['batch_size'], 

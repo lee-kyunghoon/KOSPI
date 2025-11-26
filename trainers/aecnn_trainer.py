@@ -22,8 +22,8 @@ class AECNNTrainer(BaseTrainer):
             sae_latent_dim=self.config['model']['sae_latent_dim'],
             sae_noise_factor=self.config['model']['sae_noise_factor'],
             backbone=self.config['model']['backbone'],
-            tcn_channels=self.config['model']['tcn_channels'],
-            tcn_kernel_size=self.config['model']['tcn_kernel_size'],
+            cnn_channels=self.config['model'].get('cnn_channels', [16, 32, 64, 128]),
+            cnn_kernel_sizes=self.config['model'].get('cnn_kernel_size', [5, 3, 3, 3]),
             prediction_days=self.config['data']['prediction_days'],
             sequence_length=self.config['data']['sequence_length'],
             dropout=self.config['model']['dropout'],
@@ -60,12 +60,12 @@ class AECNNTrainer(BaseTrainer):
         print(f"TensorBoard:     {self.log_dir}")
         print(f"{'='*70}\n")
     
-    def train_batch(self, X, y, x_dates, y_dates):
+    def train_batch(self, X, y):
         X, y = X.to(self.device), y.to(self.device)
         
         self.optimizer.zero_grad()
         
-        output, x_recon = self.model(X, return_reconstruction=True, x_dates=x_dates, y_dates=y_dates)
+        output, x_recon = self.model(X, return_reconstruction=True)
         
         last_close = X[:, -1, 0].unsqueeze(1)
         loss, pred_loss, recon_loss, dir_loss = self.criterion(
@@ -87,10 +87,10 @@ class AECNNTrainer(BaseTrainer):
             'dir_loss': dir_loss.item()
         }
     
-    def validate_batch(self, X, y, x_dates, y_dates):
+    def validate_batch(self, X, y):
         X, y = X.to(self.device), y.to(self.device)
         
-        output, x_recon = self.model(X, return_reconstruction=True, x_dates=x_dates, y_dates=y_dates)
+        output, x_recon = self.model(X, return_reconstruction=True)
         
         last_close = X[:, -1, 0].unsqueeze(1)
         loss, pred_loss, recon_loss, dir_loss = self.criterion(
@@ -119,9 +119,9 @@ class AECNNTrainer(BaseTrainer):
         
         batch_count = 0
         for batch_data in train_pbar:
-            X, y, x_dates, y_dates = batch_data
+            X, y = batch_data
             
-            metrics = self.train_batch(X, y, x_dates, y_dates)
+            metrics = self.train_batch(X, y)
             
             train_loss += metrics['total_loss']
             train_pred_loss += metrics['pred_loss']
@@ -155,9 +155,9 @@ class AECNNTrainer(BaseTrainer):
         batch_count = 0
         with torch.no_grad():
             for batch_data in valid_pbar:
-                X, y, x_dates, y_dates = batch_data
+                X, y = batch_data
                 
-                metrics = self.validate_batch(X, y, x_dates, y_dates)
+                metrics = self.validate_batch(X, y)
                 
                 valid_loss += metrics['total_loss']
                 valid_pred_loss += metrics['pred_loss']

@@ -169,12 +169,13 @@ def test_model(model, test_loader, scaler, device, config, model_name):
         pred_full = np.concatenate([predictions[:, i:i+1], np.zeros((predictions.shape[0], n_features-1))], axis=1)
         target_full = np.concatenate([targets[:, i:i+1], np.zeros((targets.shape[0], n_features-1))], axis=1)
         
-        # Inverse transform
-        pred_inv = scaler.inverse_transform(pred_full)
-        target_inv = scaler.inverse_transform(target_full)
+        if scaler is not None:
+            # Inverse transform
+            pred_full = scaler.inverse_transform(pred_full)
+            target_full = scaler.inverse_transform(target_full)
         
-        predictions_original[:, i] = pred_inv[:, 0]
-        targets_original[:, i] = target_inv[:, 0]
+        predictions_original[:, i] = pred_full[:, 0]
+        targets_original[:, i] = target_full[:, 0]
     
     avg_loss = total_loss / len(test_loader)
     

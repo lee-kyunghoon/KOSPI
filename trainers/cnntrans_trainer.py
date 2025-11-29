@@ -7,7 +7,7 @@ import torch.nn as nn
 import os
 from tqdm import tqdm
 from trainers.base_trainer import BaseTrainer
-from model.transformer.transformer import CNNTrans
+from model.transformer.cnn_trans import CNNTrans
 
 
 class CNNTransTrainer(BaseTrainer):

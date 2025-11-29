@@ -6,3 +6,8 @@ kkospi.egg-info/
 result/
 runs/
 test/
+*.yaml
+*.pkl
+checkpoints/
+runs/
+config/config.yaml

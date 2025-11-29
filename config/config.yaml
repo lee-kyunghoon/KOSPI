@@ -6,11 +6,11 @@ data:
   prediction_days: 5
   target_feature_idx: 0
   batch_size: 16
-  normalization_method: 'minmax'  # 'robust' or 'minmax' or 'None'
+  normalization_method: 'robust'  # 'robust' or 'minmax' or 'None'
 
 # 모델
 model:
-  model_name: 'AECNN'  # 'AECNN' or 'CNNTrans'
+  model_name: 'CNNTrans'  # 'AECNN' or 'CNNTrans'
   in_features: 9
   sae_hidden_dims: [64, 32]
   sae_latent_dim: 16
@@ -29,10 +29,10 @@ model:
 
 # 학습
 training:
-  num_epochs: 30
+  num_epochs: 50
   learning_rate: 0.0001
   weight_decay: 0.0001
-  patience: 30
+  patience: 20
   warmup_epochs: 3  # Warmup epochs
   min_lr: 0.00001  # Minimum learning rate for cosine annealing
   grad_clip_norm: 10.0

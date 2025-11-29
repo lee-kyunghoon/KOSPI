@@ -102,7 +102,7 @@ class KOSPIPredictor(nn.Module):
             prediction = prediction_expanded.squeeze(-1)
         
         if return_reconstruction:
-            return prediction, x_recon
+            return prediction, x_recon, x
         else:
             return prediction
     

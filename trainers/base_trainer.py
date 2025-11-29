@@ -56,8 +56,10 @@ class BaseTrainer:
             train_data = scaler.fit_transform(train_data)
             valid_data = scaler.transform(valid_data)
         
-        with open('data/scaler_info.pkl', 'wb') as f:
+        scaler_path = os.path.join(self.checkpoint_dir, 'scaler_info.pkl')
+        with open(scaler_path, 'wb') as f:
             pickle.dump(scaler, f)
+        print(f"Scaler saved to: {scaler_path}")
         
         train_dataset = KospiDataset(
             train_data, 

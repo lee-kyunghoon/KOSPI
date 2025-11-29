@@ -20,21 +20,21 @@ class Conv1dEmbedding(nn.Module):
         return x
 
 class PositionEncoding(nn.Module):
-    """
-    논문에서 언급한 표 형식의 절대 위치 인코딩입니다.
-    각 위치 인덱스에 대해 학습 가능한 임베딩을 사용합니다.
-    """
-    def __init__(self, d_model, max_len=9):
+    def __init__(self, d_model, max_len=100):
         super().__init__()
         self.position_embed = nn.Embedding(max_len, d_model)
+        self.max_len = max_len
 
     def forward(self, x):
-        seq_len = x.size(0)
 
+        batch_size, seq_len, d_model = x.size()
+        
+        if seq_len > self.max_len:
+            raise ValueError(f"Sequence length {seq_len} exceeds max_len {self.max_len}")
+        
         position_ids = torch.arange(seq_len, device=x.device).unsqueeze(0)
         position_encoding = self.position_embed(position_ids)
-        position_encoding = position_encoding.permute(1, 0, 2)
-
+        
         return x + position_encoding
 
 class CNNTrans(nn.Module):
@@ -72,13 +72,11 @@ class CNNTrans(nn.Module):
         src_embedded = self.embedding(src)
         src_embedded = self.linear_embed(src_embedded)
         
-        # batch_first=True이므로 permute 불필요
-        # src_embedded shape: (batch_size, seq_len, d_model)
+        # Positional Encoding 추가
+        src_pos = self.positional_encoding(src_embedded)  # (batch, seq_len, d_model)
         
-        src_pos = self.positional_encoding(src_embedded.permute(1, 0, 2))  # positional_encoding은 (seq_len, batch, d_model) 기대
-        src_pos = src_pos.permute(1, 0, 2)  # 다시 (batch, seq_len, d_model)로 변환
-        
-        encoder_output = self.encoder(src_pos)  # batch_first=True이므로 (batch, seq_len, d_model) 유지
+        # Transformer Encoder
+        encoder_output = self.encoder(src_pos)  # (batch, seq_len, d_model)
         
         encoder_output = encoder_output.permute(0, 2, 1)
         encoder_output = self.adaptive_pool(encoder_output)

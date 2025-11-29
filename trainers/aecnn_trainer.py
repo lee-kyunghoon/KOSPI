@@ -65,14 +65,13 @@ class AECNNTrainer(BaseTrainer):
         
         self.optimizer.zero_grad()
         
-        output, x_recon = self.model(X, return_reconstruction=True)
-        
+        output, x_recon, x_normalized = self.model(X, return_reconstruction=True)
         last_close = X[:, -1, 0].unsqueeze(1)
         loss, pred_loss, recon_loss, dir_loss = self.criterion(
             predictions=output,
             targets=y,
             reconstructions=x_recon,
-            inputs=X,
+            inputs=x_normalized,
             last_close=last_close
         )
         
@@ -90,14 +89,14 @@ class AECNNTrainer(BaseTrainer):
     def validate_batch(self, X, y):
         X, y = X.to(self.device), y.to(self.device)
         
-        output, x_recon = self.model(X, return_reconstruction=True)
+        output, x_recon, x_normalized = self.model(X, return_reconstruction=True)
         
         last_close = X[:, -1, 0].unsqueeze(1)
         loss, pred_loss, recon_loss, dir_loss = self.criterion(
             predictions=output,
             targets=y,
             reconstructions=x_recon,
-            inputs=X,
+            inputs=x_normalized,
             last_close=last_close
         )
         

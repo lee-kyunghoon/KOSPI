@@ -25,6 +25,7 @@ class BaseTrainer:
         self.optimizer = None
         self.scheduler = None
         self.criterion = None
+        self.scaler = None
         
         self.best_valid_loss = float('inf')
         self.early_stop_counter = 0
@@ -50,15 +51,14 @@ class BaseTrainer:
         train_data = train_df.drop(columns=['Date']).values
         valid_data = valid_df.drop(columns=['Date']).values
         
-        scaler = None
         if self.config['data']['normalization_method'] in ['robust', 'minmax']:
-            scaler = RobustScaler() if self.config['data']['normalization_method'] == 'robust' else MinMaxScaler()
-            train_data = scaler.fit_transform(train_data)
-            valid_data = scaler.transform(valid_data)
+            self.scaler = RobustScaler() if self.config['data']['normalization_method'] == 'robust' else MinMaxScaler()
+            train_data = self.scaler.fit_transform(train_data)
+            valid_data = self.scaler.transform(valid_data)
         
         scaler_path = os.path.join(self.checkpoint_dir, 'scaler_info.pkl')
         with open(scaler_path, 'wb') as f:
-            pickle.dump(scaler, f)
+            pickle.dump(self.scaler, f)
         print(f"Scaler saved to: {scaler_path}")
         
         train_dataset = KospiDataset(

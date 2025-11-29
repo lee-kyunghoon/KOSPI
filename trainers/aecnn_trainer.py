@@ -92,6 +92,13 @@ class AECNNTrainer(BaseTrainer):
         output, x_recon, x_normalized = self.model(X, return_reconstruction=True)
         
         last_close = X[:, -1, 0].unsqueeze(1)
+        
+        if self.scaler is not None:
+            output = self.scaler.inverse_transform(output.cpu().numpy())
+            y = self.scaler.inverse_transform(y.cpu().numpy())
+            output = torch.tensor(output).to(self.device)
+            y = torch.tensor(y).to(self.device)
+
         loss, pred_loss, recon_loss, dir_loss = self.criterion(
             predictions=output,
             targets=y,

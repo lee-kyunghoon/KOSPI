@@ -76,6 +76,12 @@ class CNNTransTrainer(BaseTrainer):
         # last_input = src[:, -1, 0].unsqueeze(-1).unsqueeze(-1)
         # label_ratio = label / (last_input + 1e-8)
         
+        if self.scaler is not None:
+            output = self.scaler.inverse_transform(output.cpu().numpy())
+            label = self.scaler.inverse_transform(label.cpu().numpy())
+            output = torch.tensor(output).to(self.device)
+            label = torch.tensor(label).to(self.device)
+
         loss = self.criterion(output, label)
         
         return {

@@ -26,6 +26,7 @@ class BaseTrainer:
         self.criterion = None
         
         self.best_valid_loss = float('inf')
+        self.best_mae_loss = float('inf')
         self.early_stop_counter = 0
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -162,6 +163,7 @@ class BaseTrainer:
             avg_valid = valid_metrics['total_loss']
             if avg_valid < self.best_valid_loss:
                 self.best_valid_loss = avg_valid
+                self.best_mae_loss = valid_metrics['pred_loss']
                 self.early_stop_counter = 0
                 if self.config['checkpoint']['save_best']:
                     self.save_checkpoint(epoch, avg_valid, valid_metrics)

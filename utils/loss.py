@@ -48,15 +48,17 @@ class CombinedLoss(nn.Module):
             total_loss, pred_loss, recon_loss, dir_loss
         """
         # Prediction loss
-        pred_loss = self.prediction_weight * self.mse_loss(predictions, targets)
+        pred_loss = self.mse_loss(predictions, targets)
         
         # Reconstruction loss
-        recon_loss = self.reconstruction_weight * self.mse_loss(reconstructions, inputs)
+        recon_loss = self.mse_loss(reconstructions, inputs)
         
         # Directional loss
-        dir_loss = self.directional_weight * self.directional_loss(predictions, targets, last_close)
+        dir_loss = self.directional_loss(predictions, targets, last_close)
         
         # Total loss
-        total_loss = (pred_loss + recon_loss + dir_loss)
+        total_loss = (self.prediction_weight * pred_loss + 
+                      self.reconstruction_weight * recon_loss + 
+                      self.directional_weight * dir_loss)
         
         return total_loss, pred_loss, recon_loss, dir_loss

@@ -83,17 +83,28 @@ def load_model(checkpoint_path, config, device):
     return model, model_name
 
 
-def prepare_test_data(config):
+def prepare_test_data(config, checkpoint_dir):
     """Prepare test dataset"""
     test_df = pd.read_csv("data/test.csv")
     test_data = test_df.drop(columns=['Date']).values
     
-    # Load scaler
+    # Load scaler from checkpoint directory
     if config['data']['normalization_method'] in ['robust', 'minmax']:
-        with open('data/scaler_info.pkl', 'rb') as f:
+        scaler_path = os.path.join(checkpoint_dir, 'scaler_info.pkl')
+        
+        if not os.path.exists(scaler_path):
+            raise FileNotFoundError(
+                f"Scaler file not found: {scaler_path}\n"
+                f"Make sure the checkpoint directory contains scaler_info.pkl"
+            )
+        
+        with open(scaler_path, 'rb') as f:
             scaler = pickle.load(f)
         
         test_data = scaler.transform(test_data)
+        print(f"✓ Scaler loaded from: {scaler_path}")
+    else:
+        scaler = None
     
     test_dataset = KospiDataset(
         test_data, 
@@ -265,6 +276,11 @@ def visualize_predictions(predictions, targets, save_dir='results'):
     # Set style
     sns.set_style("whitegrid")
     
+    # Use last 50 samples for visualization
+    n_viz_samples = min(50, len(predictions))
+    predictions_viz = predictions[-n_viz_samples:]
+    targets_viz = targets[-n_viz_samples:]
+    
     # 1. Prediction vs Target for each day
     n_days = predictions.shape[1]
     fig, axes = plt.subplots(1, n_days, figsize=(5*n_days, 4))
@@ -272,8 +288,8 @@ def visualize_predictions(predictions, targets, save_dir='results'):
         axes = [axes]
     
     for day in range(n_days):
-        pred_day = predictions[:, day]
-        target_day = targets[:, day]
+        pred_day = predictions_viz[:, day]
+        target_day = targets_viz[:, day]
         
         axes[day].scatter(target_day, pred_day, alpha=0.5, s=10)
         axes[day].plot([target_day.min(), target_day.max()], 
@@ -281,7 +297,7 @@ def visualize_predictions(predictions, targets, save_dir='results'):
                       'r--', lw=2, label='Perfect Prediction')
         axes[day].set_xlabel('Actual', fontsize=12)
         axes[day].set_ylabel('Predicted', fontsize=12)
-        axes[day].set_title(f'Day {day+1} Prediction', fontsize=14, fontweight='bold')
+        axes[day].set_title(f'Day {day+1} Last {n_viz_samples} Samples Prediction )', fontsize=14, fontweight='bold')
         axes[day].legend()
         axes[day].grid(True, alpha=0.3)
     
@@ -291,19 +307,18 @@ def visualize_predictions(predictions, targets, save_dir='results'):
     plt.close()
     
     # 2. Time series plot - Separate subplot for each prediction day
-    n_samples = min(200, len(predictions))
     fig, axes = plt.subplots(n_days, 1, figsize=(15, 4*n_days), sharex=True)
     if n_days == 1:
         axes = [axes]
     
     for day in range(n_days):
-        axes[day].plot(range(n_samples), targets[:n_samples, day], 
+        axes[day].plot(range(n_viz_samples), targets_viz[:, day], 
                       label='Actual', alpha=0.8, linewidth=2, color='blue')
-        axes[day].plot(range(n_samples), predictions[:n_samples, day], 
+        axes[day].plot(range(n_viz_samples), predictions_viz[:, day], 
                       label='Predicted', alpha=0.8, linewidth=2, color='red')
-        axes[day].fill_between(range(n_samples), 
-                              targets[:n_samples, day], 
-                              predictions[:n_samples, day], 
+        axes[day].fill_between(range(n_viz_samples), 
+                              targets_viz[:, day], 
+                              predictions_viz[:, day], 
                               alpha=0.3, color='gray')
         
         axes[day].set_ylabel('KOSPI Close', fontsize=11)
@@ -312,7 +327,7 @@ def visualize_predictions(predictions, targets, save_dir='results'):
         axes[day].grid(True, alpha=0.3)
     
     axes[-1].set_xlabel('Sample Index', fontsize=12)
-    fig.suptitle('Time Series Predictions (First 200 Samples)', fontsize=14, fontweight='bold', y=0.995)
+    fig.suptitle(f'Time Series Predictions (Last {n_viz_samples} Samples)', fontsize=14, fontweight='bold', y=0.995)
     
     plt.tight_layout()
     plt.savefig(os.path.join(save_dir, 'time_series.png'), dpi=150)
@@ -323,18 +338,18 @@ def visualize_predictions(predictions, targets, save_dir='results'):
     fig, ax = plt.subplots(figsize=(15, 6))
     
     # Plot actual values for Day 1 only (as reference)
-    ax.plot(range(n_samples), targets[:n_samples, 0], 
+    ax.plot(range(n_viz_samples), targets_viz[:, 0], 
            label='Actual (Day 1)', alpha=0.8, linewidth=2, color='black', linestyle='-')
     
     # Plot predictions for all days
     colors = plt.cm.rainbow(np.linspace(0, 1, n_days))
     for day in range(n_days):
-        ax.plot(range(n_samples), predictions[:n_samples, day], 
+        ax.plot(range(n_viz_samples), predictions_viz[:, day], 
                label=f'Predicted Day {day+1}', alpha=0.7, linewidth=1.5, color=colors[day])
     
     ax.set_xlabel('Sample Index', fontsize=12)
     ax.set_ylabel('KOSPI Close Price', fontsize=12)
-    ax.set_title('All Predictions Overlaid (First 200 Samples)', fontsize=14, fontweight='bold')
+    ax.set_title(f'All Predictions Overlaid (Last {n_viz_samples} Samples)', fontsize=14, fontweight='bold')
     ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     ax.grid(True, alpha=0.3)
     
@@ -396,6 +411,9 @@ def main():
     config = load_config(args.config)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
+    # Get checkpoint directory
+    checkpoint_dir = os.path.dirname(args.checkpoint)
+    
     print("\n" + "="*70)
     print("KOSPI Prediction Model - Test Script")
     print("="*70)
@@ -409,7 +427,7 @@ def main():
     model, model_name = load_model(args.checkpoint, config, device)
     
     # Prepare test data
-    test_loader, scaler = prepare_test_data(config)
+    test_loader, scaler = prepare_test_data(config, checkpoint_dir)
     print(f"\n✓ Test data loaded: {len(test_loader.dataset)} samples")
     
     # Test model

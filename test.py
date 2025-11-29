@@ -291,7 +291,7 @@ def visualize_predictions(predictions, targets, save_dir='results'):
     plt.close()
     
     # 2. Time series plot - Separate subplot for each prediction day
-    n_samples = min(200, len(predictions))
+    n_samples = min(50, len(predictions))
     fig, axes = plt.subplots(n_days, 1, figsize=(15, 4*n_days), sharex=True)
     if n_days == 1:
         axes = [axes]

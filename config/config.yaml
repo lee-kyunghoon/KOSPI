@@ -6,11 +6,11 @@ data:
   prediction_days: 5
   target_feature_idx: 0
   batch_size: 16
-  normalization_method: 'minmax'  # 'robust' or 'minmax' or 'None'
+  normalization_method: 'robust'  # 'robust' or 'minmax' or 'None'
 
 # 모델
 model:
-  model_name: 'AECNN'  # 'AECNN' or 'CNNTrans'
+  model_name: 'CNNTrans'  # 'AECNN' or 'CNNTrans'
   in_features: 9
   sae_hidden_dims: [64, 32]
   sae_latent_dim: 16

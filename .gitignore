@@ -1,3 +1,8 @@
 *.csv
 *.vscode
 *.pyc
+checkpoints/
+kkospi.egg-info/
+result/
+runs/
+test/

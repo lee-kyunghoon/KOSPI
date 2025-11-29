@@ -187,8 +187,8 @@ def create_combined_dataset(start_date, end_date):
 
 # 예시 사용법
 if __name__ == "__main__": 
-    start_date = '2010-01-01'
-    end_date = '2025-10-31'
+    start_date = '2025-01-01'
+    end_date = '2025-11-12'
     
     print("="*70)
     print("KOSPI 데이터셋 생성 시작")

@@ -1,3 +1,8 @@
 *.csv
 *.vscode
 *.pyc
+*.yaml
+*.pkl
+checkpoints/
+runs/
+config/config.yaml

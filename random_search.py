@@ -9,8 +9,8 @@ from trainers.cnntrans_trainer import CNNTransTrainer
 from trainers.aecnn_trainer import AECNNTrainer
 
 def main():
-    n_trials = 10 # 시도할 하이퍼파라미터 조합 수
-    top_k = 5  # 상위 k개 저장
+    n_trials = 100 # 시도할 하이퍼파라미터 조합 수
+    top_k = 10  # 상위 k개 저장
     config_path = 'config/config.yaml'
     base_config = load_config(config_path)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -44,6 +44,7 @@ def main():
         current_config['data']['batch_size'] = params['batch_size']
         current_config['data']['sequence_length'] = params['sequence_length']
         current_config['model']['dropout'] = params['dropout']
+        current_config['data']['normalization_method'] = params['normalization_method']
         
         # Model 설정 업데이트
         if base_config['model']['model_name'].lower() == "cnntrans":
@@ -58,7 +59,7 @@ def main():
             current_config['training']['directional_weight'] = params['directional_weight'] 
 
         # 체크포인트 디렉토리 이름 변경
-        current_config['checkpoint']['dir'] = f"test/checkpoints/trial_{i+1}"
+        current_config['checkpoint']['dir'] = f"/mnt/d/lgh/kospi/test/checkpoints/trial_{i+1}"
         
         try:
             # Trainer 초기화 및 학습
@@ -196,7 +197,8 @@ def get_random_hyperparameters(model_name):
     search_space = {
         'batch_size': [8, 16, 32, 64],
         'dropout': [0.1, 0.2, 0.3],
-        'sequence_length': [15, 30, 60, 120]
+        'sequence_length': [15, 30, 60, 120],
+        'normalization_method': ['robust', 'minmax', 'None']
     }
 
     if(model_name.lower() == 'cnntrans'):
@@ -211,6 +213,7 @@ def get_random_hyperparameters(model_name):
     params['batch_size'] = random.choice(search_space['batch_size'])
     params['sequence_length'] = random.choice(search_space['sequence_length'])
     params['dropout'] = random.choice(search_space['dropout'])
+    params['normalization_method'] = random.choice(search_space['normalization_method'])
 
     if(model_name.lower() == 'cnntrans'):
         params['d_model'] = random.choice(search_space['d_model'])

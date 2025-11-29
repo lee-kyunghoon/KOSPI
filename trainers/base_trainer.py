@@ -8,6 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 import pandas as pd
 import os
 import shutil
+import yaml
 from datetime import datetime
 import pickle
 from sklearn.preprocessing import RobustScaler, MinMaxScaler
@@ -34,7 +35,10 @@ class BaseTrainer:
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         
         config_dest = os.path.join(self.checkpoint_dir, 'config.yaml')
-        shutil.copy2(self.config_path, config_dest)
+        # shutil.copy2(self.config_path, config_dest)
+        # Save the current config dictionary instead of copying the original file
+        with open(config_dest, 'w') as f:
+            yaml.dump(self.config, f, default_flow_style=False)
         
         self.log_dir = os.path.join('runs', f"kospi_{timestamp}_{model_name}")
         self.writer = SummaryWriter(self.log_dir)

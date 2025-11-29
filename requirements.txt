@@ -1,0 +1,13 @@
+torch>=2
+torchvision
+pyyaml
+seaborn
+tensorboard
+tqdm
+numpy<2
+yfinance
+pandas
+streamlit
+plotly
+matplotlib
+scikit-learn

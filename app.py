@@ -178,15 +178,24 @@ def predict_next_5_days(model, data, scaler, config):
     
     with torch.no_grad():
         if isinstance(model, CNNTrans):
-            output = model(input_tensor)
-            if isinstance(output, tuple):
-                predictions = output[0]
-            else:
-                predictions = output
+            output, _ = model(input_tensor)
+            output = output.squeeze(-1)
+            predictions = output.squeeze(0).cpu().numpy()
         else:
             predictions = model(input_tensor, return_reconstruction=False)
+            predictions = predictions.squeeze().cpu().numpy()
     
-    predictions = predictions.squeeze().cpu().numpy()
+    if scaler is not None:
+        n_features = config['model']['in_features']
+        n_pred_days = len(predictions)
+        predictions_original = np.zeros(n_pred_days)
+        
+        for i in range(n_pred_days):
+            pred_full = np.concatenate([predictions[i:i+1], np.zeros(n_features-1)])
+            pred_inv = scaler.inverse_transform(pred_full.reshape(1, -1))
+            predictions_original[i] = pred_inv[0, 0]
+        
+        return predictions_original
     
     return predictions
 

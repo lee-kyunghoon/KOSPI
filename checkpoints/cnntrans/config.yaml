@@ -1,0 +1,49 @@
+checkpoint:
+  dir: /mnt/d/lgh/kospi/cnn_trans/checkpoints/trial_9
+  save_best: true
+  save_final: true
+data:
+  batch_size: 32
+  normalization_method: robust
+  prediction_days: 5
+  sequence_length: 15
+  target_feature_idx: 0
+model:
+  backbone: cnn1d
+  cnn_channels:
+  - 16
+  - 32
+  - 64
+  - 128
+  cnn_kernel_size:
+  - 5
+  - 3
+  - 3
+  - 3
+  conv_kernel_size: 3
+  conv_out_channels: 252
+  d_model: 256
+  dim_feedforward: 1024
+  dropout: 0.1
+  in_features: 9
+  model_name: CNNTrans
+  n_head: 8
+  nhead: 4
+  num_encoder_layers: 4
+  sae_hidden_dims:
+  - 64
+  - 32
+  sae_latent_dim: 16
+  sae_noise_factor: 0.05
+  use_revin: true
+training:
+  directional_weight: 1
+  grad_clip_norm: 10.0
+  learning_rate: 0.00020943063726127674
+  min_lr: 1.0e-05
+  num_epochs: 50
+  patience: 15
+  prediction_weight: 50.0
+  reconstruction_weight: 0.1
+  warmup_epochs: 3
+  weight_decay: 0.0001

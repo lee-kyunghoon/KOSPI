@@ -13,6 +13,7 @@ import yfinance as yf
 import plotly.graph_objects as go
 from model.ae.model import KOSPIPredictor
 from model.transformer.transformer import CNNTrans
+import atexit
 
 
 @st.cache_resource
@@ -190,6 +191,13 @@ def predict_next_5_days(model, data, scaler, config):
     return predictions
 
 
+def cleanup_temp_checkpoints():
+    temp_dir = 'temp_checkpoints'
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
+
+atexit.register(cleanup_temp_checkpoints)
+
 # ==================== Streamlit UI ====================
 
 st.set_page_config(
@@ -204,12 +212,47 @@ st.title("KOSPI 5일 예측 시스템")
 with st.sidebar:
     st.header("모델 설정")
     
-    upload_option = st.radio(
-        "체크포인트 선택 방법",
-        ["기존 폴더 선택", "새 체크포인트 업로드"]
+    st.subheader("모델 선택")
+    
+    model_options = ["AECNN", "CNNTrans"]
+    
+    selected_model = st.radio(
+        "모델 타입",
+        model_options,
+        index=0,
+        horizontal=True,
+        help="사용할 모델 타입을 선택하세요.",
+        key="model_selector"
     )
     
-    if upload_option == "새 체크포인트 업로드":
+    if 'last_selected_model' not in st.session_state:
+        st.session_state['last_selected_model'] = selected_model
+    
+    if st.session_state['last_selected_model'] != selected_model:
+        if 'predictions' in st.session_state:
+            del st.session_state['predictions']
+        if 'last_trading_day' in st.session_state:
+            del st.session_state['last_trading_day']
+        if 'next_trading_days' in st.session_state:
+            del st.session_state['next_trading_days']
+        if 'market_data' in st.session_state:
+            del st.session_state['market_data']
+        if 'model_name' in st.session_state:
+            del st.session_state['model_name']
+        if 'uploaded_checkpoint' in st.session_state:
+            del st.session_state['uploaded_checkpoint']
+        st.session_state['last_selected_model'] = selected_model
+    
+    st.session_state['selected_model_type'] = selected_model.lower()
+    
+    st.divider()
+    
+    upload_option = st.radio(
+        "체크포인트 선택 방법",
+        ["기존 폴더 선택", "ZIP 파일 업로드"]
+    )
+    
+    if upload_option == "ZIP 파일 업로드":
         st.info("체크포인트 폴더를 압축(zip)하여 업로드하세요.")
         
         uploaded_file = st.file_uploader("ZIP 파일 업로드", type=['zip'])
@@ -227,70 +270,34 @@ with st.sidebar:
                 
                 if extracted_dirs:
                     source_dir = os.path.join(tmpdir, extracted_dirs[0])
-                    target_dir = os.path.join('.', 'uploaded_checkpoint')
+                    model_folder = selected_model.lower()
+                    target_dir = os.path.join('temp_checkpoints', model_folder)
+                    
+                    os.makedirs('temp_checkpoints', exist_ok=True)
                     
                     if os.path.exists(target_dir):
                         shutil.rmtree(target_dir)
                     
                     shutil.copytree(source_dir, target_dir)
-                    st.success(f"업로드 완료: {target_dir}")
-                    st.session_state['uploaded'] = True
+                    st.success(f"업로드 완료")
+                    st.session_state['uploaded_checkpoint'] = target_dir
     
-    checkpoint_dirs = [d for d in os.listdir('.') if os.path.isdir(d) and ('checkpoint' in d.lower() or d == 'uploaded_checkpoint')]
-    
-    if not checkpoint_dirs:
-        st.error("checkpoint 폴더를 찾을 수 없습니다.")
-        st.info("학습된 모델의 checkpoint 폴더를 배치하거나 업로드하세요.")
-        st.stop()
-    
-    st.divider()
-    
-    # 모델 선택 토글
-    st.subheader("모델 선택")
-    
-    model_options = ["AECNN", "CNNTrans"]
-    
-    selected_model = st.radio(
-        "모델 타입",
-        model_options,
-        index=0,
-        horizontal=True,
-        help="사용할 모델 타입을 선택하세요.",
-        key="model_selector"
-    )
-    
-    # 모델 변경 시 결과 리셋
-    if 'last_selected_model' not in st.session_state:
-        st.session_state['last_selected_model'] = selected_model
-    
-    if st.session_state['last_selected_model'] != selected_model:
-        # 결과 초기화
-        if 'predictions' in st.session_state:
-            del st.session_state['predictions']
-        if 'last_trading_day' in st.session_state:
-            del st.session_state['last_trading_day']
-        if 'next_trading_days' in st.session_state:
-            del st.session_state['next_trading_days']
-        if 'market_data' in st.session_state:
-            del st.session_state['market_data']
-        if 'model_name' in st.session_state:
-            del st.session_state['model_name']
-        st.session_state['last_selected_model'] = selected_model
-    
-    # 선택된 모델 타입 저장
-    st.session_state['selected_model_type'] = selected_model.lower()
-    
-    # 모델별 체크포인트 경로 설정
     model_folder = selected_model.lower()
-    checkpoint_base = 'checkpoints'
     
-    if os.path.exists(os.path.join(checkpoint_base, model_folder)):
-        checkpoint_path = os.path.join(checkpoint_base, model_folder, 'best_model.pt')
-        config_path = os.path.join(checkpoint_base, model_folder, 'config.yaml')
-        selected_checkpoint = os.path.join(checkpoint_base, model_folder)
+    if upload_option == "ZIP 파일 업로드" and 'uploaded_checkpoint' in st.session_state:
+        selected_checkpoint = st.session_state['uploaded_checkpoint']
+        checkpoint_path = os.path.join(selected_checkpoint, 'best_model.pt')
+        config_path = os.path.join(selected_checkpoint, 'config.yaml')
     else:
-        st.error(f"{model_folder} 폴더를 찾을 수 없습니다: {os.path.join(checkpoint_base, model_folder)}")
-        st.stop()
+        checkpoint_base = 'checkpoints'
+        
+        if os.path.exists(os.path.join(checkpoint_base, model_folder)):
+            checkpoint_path = os.path.join(checkpoint_base, model_folder, 'best_model.pt')
+            config_path = os.path.join(checkpoint_base, model_folder, 'config.yaml')
+            selected_checkpoint = os.path.join(checkpoint_base, model_folder)
+        else:
+            st.error(f"{model_folder} 폴더를 찾을 수 없습니다. ZIP 파일 업로드를 사용하세요.")
+            st.stop()
     
     if not os.path.exists(checkpoint_path):
         st.error(f"모델 파일을 찾을 수 없습니다: {checkpoint_path}")
@@ -314,12 +321,10 @@ with st.sidebar:
     
     target_date = datetime.combine(target_date, datetime.min.time())
     
-    # 날짜 변경 시 결과 리셋
     if 'last_target_date' not in st.session_state:
         st.session_state['last_target_date'] = target_date
     
     if st.session_state['last_target_date'] != target_date:
-        # 결과 초기화
         if 'predictions' in st.session_state:
             del st.session_state['predictions']
         if 'last_trading_day' in st.session_state:
@@ -351,19 +356,15 @@ with col_info3:
 if st.button("예측 실행", type="primary", use_container_width=True):
     with st.spinner("모델 로딩 중..."):
         try:
-            # 선택된 모델 타입으로 체크포인트 수정
             checkpoint = torch.load(checkpoint_path, map_location='cpu')
             checkpoint['model_name'] = st.session_state.get('selected_model_type', 'aecnn')
             
-            # 임시 파일로 저장
             temp_checkpoint_path = checkpoint_path + '.temp'
             torch.save(checkpoint, temp_checkpoint_path)
             
-            # 모델 로드
             model, model_name = load_model(temp_checkpoint_path, config)
             scaler = load_scaler(selected_checkpoint, config['data']['normalization_method'])
             
-            # 임시 파일 삭제
             os.remove(temp_checkpoint_path)
             
             st.session_state['status_messages'] = [f"모델 로드 완료: {model_name.upper()}"]
@@ -432,7 +433,6 @@ if 'predictions' in st.session_state:
     col_chart, col_table = st.columns([2, 1])
     
     with col_chart:
-        # 시각화용: 최근 7일 + 5일 예측 (총 12일)
         display_len = 7
         
         hist_data = market_data.iloc[-display_len:]['KOSPI_Close'].values
@@ -440,7 +440,6 @@ if 'predictions' in st.session_state:
         
         fig = go.Figure()
         
-        # 실제 종가 (sequence_length일)
         fig.add_trace(go.Scatter(
             x=[d.strftime('%Y-%m-%d') for d in hist_dates],
             y=hist_data,
@@ -450,7 +449,6 @@ if 'predictions' in st.session_state:
             hovertemplate='<b>%{x}</b><br>종가: %{y:,.2f}<extra></extra>'
         ))
         
-        # 예측 종가 (5일)
         fig.add_trace(go.Scatter(
             x=[last_trading_day.strftime('%Y-%m-%d')] + [d.strftime('%Y-%m-%d') for d in next_trading_days],
             y=[last_close] + list(predictions),
@@ -461,7 +459,6 @@ if 'predictions' in st.session_state:
             hovertemplate='<b>%{x}</b><br>예측: %{y:,.2f}<extra></extra>'
         ))
         
-        # Streamlit 테마 자동 적용
         fig.update_layout(
             title=f"KOSPI 종가 예측 ({model_name.upper()} 모델)",
             xaxis_title="날짜",
@@ -469,7 +466,7 @@ if 'predictions' in st.session_state:
             hovermode='x unified',
             height=450,
             margin=dict(l=10, r=10, t=60, b=10),
-            template="plotly"  # Streamlit 테마 자동 적용
+            template="plotly"
         )
         
         st.plotly_chart(fig, use_container_width=True)
@@ -492,7 +489,6 @@ if 'predictions' in st.session_state:
         else:
             st.metric("5일 누적 등락률", f"{total_change:.2f}%", delta=None)
     
-    # 상태 메시지 표시 (그래프와 표 아래)
     if 'status_messages' in st.session_state:
         st.divider()
         for msg in st.session_state['status_messages']:

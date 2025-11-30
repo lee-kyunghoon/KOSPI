@@ -1,0 +1,48 @@
+checkpoint:
+  dir: /mnt/d/lgh/kospi/ae/checkpoints/trial_43
+  save_best: true
+  save_final: true
+data:
+  batch_size: 64
+  normalization_method: None
+  prediction_days: 5
+  sequence_length: 15
+  target_feature_idx: 0
+model:
+  backbone: cnn1d
+  cnn_channels:
+  - 16
+  - 32
+  - 64
+  - 128
+  cnn_kernel_size:
+  - 5
+  - 3
+  - 3
+  - 3
+  conv_kernel_size: 3
+  conv_out_channels: 252
+  d_model: 512
+  dim_feedforward: 2048
+  dropout: 0.3
+  in_features: 9
+  model_name: AECNN
+  n_head: 8
+  num_encoder_layers: 3
+  sae_hidden_dims:
+  - 64
+  - 32
+  sae_latent_dim: 16
+  sae_noise_factor: 0.07414907432793504
+  use_revin: true
+training:
+  directional_weight: 0.14347917710250724
+  grad_clip_norm: 10.0
+  learning_rate: 0.000632518225394874
+  min_lr: 1.0e-05
+  num_epochs: 50
+  patience: 15
+  prediction_weight: 0.9874409124220732
+  reconstruction_weight: 0.4844936042373653
+  warmup_epochs: 3
+  weight_decay: 0.0001

@@ -84,7 +84,10 @@ python -m predict --checkpoint path/to/pt/folder
     * Example: `path/to/pt/folder/results/`
 * **내용:** 시계열 비교 그래프(Actual vs Predicted), Error Distribution 히스토그램, 평가지표 결과 텍스트 파일 등이 포함됩니다.
 
-## 7. Contributors
+## 7. Demo
+`demo/` 폴더에 있는 pdf 확인
+
+## 8. Contributors
 * **이경훈:** 프로젝트 총괄, 제안 모델2(CNN-Transformer) 구현, 결과 분석
 * **박종기:** 데이터 수집, 학습 전략 계획, GUI 구현, 보고서 작성
 * **김지원:** 전처리, 제안 모델1(AE-CNN) 구현, 평가지표 계산
